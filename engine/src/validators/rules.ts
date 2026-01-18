@@ -225,11 +225,16 @@ function referencesHiddenState(expr: string): boolean {
 /**
  * Extracts candidate input identifiers from condition string.
  * Structural only; assumes identifiers are space- or symbol-delimited.
- * Filters out numeric literals and common keywords.
+ * Filters out numeric literals, common keywords, and JSON expression structure.
  */
 function extractReferencedInputs(expr: string): string[] {
   const tokens = expr.split(/[^a-zA-Z0-9_]/).filter(Boolean);
-  const keywords = ['true', 'false', 'null', 'undefined', 'if', 'else', 'and', 'or', 'not'];
+  // Keywords to filter out: boolean literals, control flow, logic operators,
+  // and MVP rule expression structure keys (var, op, value, all, any)
+  const keywords = [
+    'true', 'false', 'null', 'undefined', 'if', 'else', 'and', 'or', 'not',
+    'var', 'op', 'value', 'all', 'any', // MVP expression structure
+  ];
   return Array.from(new Set(tokens)).filter(t => 
     !keywords.includes(t.toLowerCase()) && !/^\d+$/.test(t)
   );

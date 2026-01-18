@@ -1,0 +1,1 @@
+{"contract_hash":"sha256:df0a99f22f85ef8c2011956970b2a964129daf7507ebcb8926cdf30ae88112fd","contract_id":"age_gate_decision@1.0.0","scenario":"happy-path","session_id":"harness-happy-path","stages_ready":["FRAMING","INPUTS","OUTPUTS","POLICIES","RULES","SIMULATION_FINALIZATION"],"terminal_status":"ACCEPTED","timestamp":"2026-01-18T12:00:00.000Z"}
