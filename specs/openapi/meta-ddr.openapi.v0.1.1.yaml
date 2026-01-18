@@ -1,0 +1,552 @@
+openapi: 3.1.0
+info:
+  title: DDR Control Plane – Meta DDR API (MVP)
+  description: >
+    Governed intake, validation, simulation, and contract generation API
+    for deterministic decision systems using Meta DDR.
+    
+    This specification is FROZEN for MVP. Changes require invariant review
+    and version bump.
+  version: "0.1.1"
+
+servers:
+  - url: /meta-ddr/v1
+
+tags:
+  - name: Intake Sessions
+  - name: Stage Submission
+  - name: Transitions
+  - name: Simulation
+  - name: Finalization
+  - name: Contracts
+
+paths:
+
+  /intake-sessions:
+    post:
+      tags: [Intake Sessions]
+      summary: Create a new intake session
+      operationId: createIntakeSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIntakeSessionRequest"
+      responses:
+        "201":
+          description: Intake session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeSession"
+        "400":
+          description: Protocol error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /intake-sessions/{intakeSessionId}:
+    get:
+      tags: [Intake Sessions]
+      summary: Get intake session state
+      operationId: getIntakeSession
+      parameters:
+        - $ref: "#/components/parameters/IntakeSessionId"
+      responses:
+        "200":
+          description: Current intake session state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeSessionState"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /intake-sessions/{intakeSessionId}/stages/{stage}:
+    put:
+      tags: [Stage Submission]
+      summary: Submit artifacts for a stage (idempotent)
+      operationId: submitStageArtifacts
+      parameters:
+        - $ref: "#/components/parameters/IntakeSessionId"
+        - $ref: "#/components/parameters/Stage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StageSubmissionRequest"
+      responses:
+        "200":
+          description: Stage evaluated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluationResult"
+        "409":
+          description: Invalid state (e.g., session finalized)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluationResult"
+
+  /intake-sessions/{intakeSessionId}/transitions:
+    post:
+      tags: [Transitions]
+      summary: Request a stage transition
+      operationId: requestStageTransition
+      parameters:
+        - $ref: "#/components/parameters/IntakeSessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StageTransitionRequest"
+      responses:
+        "200":
+          description: Transition evaluated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluationResult"
+        "409":
+          description: Invalid transition or finalized session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluationResult"
+
+  /intake-sessions/{intakeSessionId}/simulation:run:
+    post:
+      tags: [Simulation]
+      summary: Run simulation cases
+      operationId: runSimulation
+      parameters:
+        - $ref: "#/components/parameters/IntakeSessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulationRequest"
+      responses:
+        "200":
+          description: Simulation executed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulationResult"
+        "409":
+          description: Simulation not allowed (e.g., session finalized)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluationResult"
+
+  /intake-sessions/{intakeSessionId}/finalize:
+    post:
+      tags: [Finalization]
+      summary: Finalize and generate decision contract
+      operationId: finalizeContract
+      parameters:
+        - $ref: "#/components/parameters/IntakeSessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinalizeRequest"
+      responses:
+        "201":
+          description: Contract accepted and generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinalizeResponse"
+        "409":
+          description: Finalization rejected (e.g., already finalized)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluationResult"
+
+  /contracts/{contractId}/versions/{version}:
+    get:
+      tags: [Contracts]
+      summary: Retrieve a canonical decision contract
+      operationId: getContract
+      parameters:
+        - $ref: "#/components/parameters/ContractId"
+        - $ref: "#/components/parameters/ContractVersion"
+      responses:
+        "200":
+          description: Canonical contract artifact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContractArtifact"
+        "404":
+          description: Contract not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+
+  parameters:
+    IntakeSessionId:
+      name: intakeSessionId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    Stage:
+      name: stage
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Stage"
+
+    ContractId:
+      name: contractId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    ContractVersion:
+      name: version
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+
+    Stage:
+      type: string
+      enum:
+        - FRAMING
+        - INPUTS
+        - OUTPUTS
+        - POLICIES
+        - RULES
+        - SIMULATION_FINALIZATION
+
+    IntakeStatus:
+      type: string
+      enum: [IN_PROGRESS, BLOCKED, ACCEPTED, REJECTED]
+
+    StageState:
+      type: string
+      enum: [INCOMPLETE, UNDER_REVIEW, BLOCKED, READY]
+
+    Decision:
+      type: string
+      enum: [ALLOW, BLOCK, REJECT, ACCEPTED]
+      description: >
+        ACCEPTED may only be returned by the /finalize endpoint.
+        All other endpoints return ALLOW, BLOCK, or REJECT.
+
+    CreateIntakeSessionRequest:
+      type: object
+      required: [meta_contract_id]
+      properties:
+        meta_contract_id:
+          type: string
+        mode:
+          type: string
+          enum: [DESIGN_ONLY]
+          description: >
+            Future modes (e.g., SANDBOX_EXECUTION) may be introduced.
+        initial_stage:
+          $ref: "#/components/schemas/Stage"
+
+    IntakeSession:
+      type: object
+      required:
+        - intake_session_id
+        - meta_contract_id
+        - status
+        - stage
+        - revision
+      properties:
+        intake_session_id:
+          type: string
+        meta_contract_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/IntakeStatus"
+        stage:
+          $ref: "#/components/schemas/Stage"
+        revision:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Optional session expiry timestamp (not enforced in MVP)
+        terminal_status:
+          type: string
+          enum: [ACCEPTED, REJECTED]
+          nullable: true
+          description: Set when session reaches terminal state
+
+    IntakeSessionState:
+      allOf:
+        - $ref: "#/components/schemas/IntakeSession"
+        - type: object
+          properties:
+            stage_state:
+              $ref: "#/components/schemas/StageState"
+            last_evaluation:
+              $ref: "#/components/schemas/EvaluationResult"
+
+    StageSubmissionRequest:
+      type: object
+      required: [idempotency_key, artifacts]
+      properties:
+        idempotency_key:
+          type: string
+          format: uuid
+        artifacts:
+          type: object
+          additionalProperties: true
+
+    StageTransitionRequest:
+      type: object
+      required: [from_stage, to_stage]
+      properties:
+        from_stage:
+          $ref: "#/components/schemas/Stage"
+        to_stage:
+          $ref: "#/components/schemas/Stage"
+
+    Finding:
+      type: object
+      required:
+        - code
+        - severity
+        - invariant
+        - message
+        - next_action
+      properties:
+        code:
+          type: string
+        severity:
+          type: string
+          enum: [BLOCK, REJECT, WARN]
+        invariant:
+          type: string
+        field_path:
+          type: string
+          nullable: true
+        message:
+          type: string
+        next_action:
+          type: string
+        action_target:
+          type: string
+          nullable: true
+
+    EvaluationResult:
+      type: object
+      required:
+        - meta_contract_id
+        - intake_session_id
+        - stage
+        - decision
+        - status
+        - stage_state
+        - can_proceed
+        - revision
+      properties:
+        meta_contract_id:
+          type: string
+        intake_session_id:
+          type: string
+        stage:
+          $ref: "#/components/schemas/Stage"
+        decision:
+          $ref: "#/components/schemas/Decision"
+        status:
+          $ref: "#/components/schemas/IntakeStatus"
+        stage_state:
+          $ref: "#/components/schemas/StageState"
+        can_proceed:
+          type: boolean
+        next_stage:
+          $ref: "#/components/schemas/Stage"
+          nullable: true
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        revision:
+          type: integer
+        server_time:
+          type: string
+          format: date-time
+
+    SimulationRequest:
+      type: object
+      required: [cases]
+      properties:
+        cases:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/SimulationCase"
+
+    SimulationCase:
+      type: object
+      required: [case_id, inputs]
+      properties:
+        case_id:
+          type: string
+        inputs:
+          type: object
+          additionalProperties: true
+        expected_output:
+          type: string
+          nullable: true
+          description: >
+            If null, simulation runs without output assertion (exploratory mode).
+
+    SimulationResult:
+      type: object
+      required:
+        - intake_session_id
+        - stage
+        - decision
+        - stage_state
+        - can_proceed
+      properties:
+        intake_session_id:
+          type: string
+        stage:
+          $ref: "#/components/schemas/Stage"
+        decision:
+          $ref: "#/components/schemas/Decision"
+        stage_state:
+          $ref: "#/components/schemas/StageState"
+        can_proceed:
+          type: boolean
+        simulation_results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SimulationCaseResult"
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        revision:
+          type: integer
+        server_time:
+          type: string
+          format: date-time
+
+    SimulationCaseResult:
+      type: object
+      required: [case_id, output, trace]
+      properties:
+        case_id:
+          type: string
+        output:
+          type: string
+        trace:
+          $ref: "#/components/schemas/Trace"
+
+    Trace:
+      type: object
+      properties:
+        contract_version:
+          type: string
+        policy_checks:
+          type: array
+          items:
+            type: string
+        rule_path:
+          type: array
+          items:
+            type: string
+        refusal:
+          type: boolean
+      additionalProperties: true
+
+    FinalizeRequest:
+      type: object
+      required: [acceptance_confirmation]
+      properties:
+        acceptance_confirmation:
+          type: boolean
+        requested_contract_version:
+          type: string
+
+    FinalizeResponse:
+      type: object
+      required:
+        - intake_session_id
+        - status
+        - decision
+        - contract_artifact
+      properties:
+        intake_session_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/IntakeStatus"
+        decision:
+          $ref: "#/components/schemas/Decision"
+        contract_artifact:
+          $ref: "#/components/schemas/ContractArtifact"
+        revision:
+          type: integer
+
+    ContractArtifact:
+      type: object
+      required:
+        - contract_id
+        - version
+        - hash
+        - format
+        - download_url
+      properties:
+        contract_id:
+          type: string
+        version:
+          type: string
+        hash:
+          type: string
+        format:
+          type: string
+          enum: [json]
+        download_url:
+          type: string
+          format: uri
+        canonical_json:
+          type: object
+          additionalProperties: true
+
+    ErrorResponse:
+      type: object
+      required: [error_code, message]
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
