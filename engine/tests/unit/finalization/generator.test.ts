@@ -3,7 +3,7 @@
  * Phase 5: Contract artifact generation tests
  */
 
-import { generateContract } from '../../../src/finalization/generator';
+import { generateContract, GenerateResult } from '../../../src/finalization/generator';
 import { createInitialSession } from '../../../src/types/session';
 
 function readySession(now: string) {
@@ -62,19 +62,21 @@ function readySession(now: string) {
 }
 
 describe('generateContract', () => {
-  test('returns ContractArtifact with stable contract_id and hash', () => {
+  test('returns ok:true with ContractArtifact on success', () => {
     const now = '2026-01-18T12:00:00.000Z';
     const s = readySession(now);
 
-    const a1 = generateContract(s, '1.0.0', now);
-    const a2 = generateContract(s, '1.0.0', now);
+    const r1 = generateContract(s, '1.0.0', now);
+    const r2 = generateContract(s, '1.0.0', now);
 
-    expect(a1).not.toBeNull();
-    expect(a2).not.toBeNull();
+    expect(r1.ok).toBe(true);
+    expect(r2.ok).toBe(true);
 
-    expect(a1!.contract_id).toBe('age_gate@1.0.0');
-    expect(a1!.hash).toBe(a2!.hash);
-    expect(a1!.canonical_json).toBeDefined();
+    if (r1.ok && r2.ok) {
+      expect(r1.artifact.contract_id).toBe('age_gate@1.0.0');
+      expect(r1.artifact.hash).toBe(r2.artifact.hash);
+      expect(r1.artifact.canonical_json).toBeDefined();
+    }
   });
 
   test('hash is deterministic for same inputs', () => {
@@ -82,63 +84,84 @@ describe('generateContract', () => {
     const s1 = readySession(now);
     const s2 = readySession(now);
 
-    const a1 = generateContract(s1, '1.0.0', now);
-    const a2 = generateContract(s2, '1.0.0', now);
+    const r1 = generateContract(s1, '1.0.0', now);
+    const r2 = generateContract(s2, '1.0.0', now);
 
-    expect(a1!.hash).toBe(a2!.hash);
+    expect(r1.ok).toBe(true);
+    expect(r2.ok).toBe(true);
+    if (r1.ok && r2.ok) {
+      expect(r1.artifact.hash).toBe(r2.artifact.hash);
+    }
   });
 
   test('hash changes when version changes', () => {
     const now = '2026-01-18T12:00:00.000Z';
     const s = readySession(now);
 
-    const a1 = generateContract(s, '1.0.0', now);
-    const a2 = generateContract(s, '2.0.0', now);
+    const r1 = generateContract(s, '1.0.0', now);
+    const r2 = generateContract(s, '2.0.0', now);
 
-    expect(a1!.hash).not.toBe(a2!.hash);
+    expect(r1.ok).toBe(true);
+    expect(r2.ok).toBe(true);
+    if (r1.ok && r2.ok) {
+      expect(r1.artifact.hash).not.toBe(r2.artifact.hash);
+    }
   });
 
   test('hash changes when generatedAt changes', () => {
     const s = readySession('2026-01-18T12:00:00.000Z');
 
-    const a1 = generateContract(s, '1.0.0', '2026-01-18T12:00:00.000Z');
-    const a2 = generateContract(s, '1.0.0', '2026-01-18T13:00:00.000Z');
+    const r1 = generateContract(s, '1.0.0', '2026-01-18T12:00:00.000Z');
+    const r2 = generateContract(s, '1.0.0', '2026-01-18T13:00:00.000Z');
 
-    expect(a1!.hash).not.toBe(a2!.hash);
+    expect(r1.ok).toBe(true);
+    expect(r2.ok).toBe(true);
+    if (r1.ok && r2.ok) {
+      expect(r1.artifact.hash).not.toBe(r2.artifact.hash);
+    }
   });
 
-  test('returns null when FRAMING artifacts missing', () => {
+  test('returns MISSING_ARTIFACTS when FRAMING artifacts missing', () => {
     const now = '2026-01-18T12:00:00.000Z';
     const s = readySession(now);
     s.artifacts.FRAMING = null as unknown as Record<string, unknown>;
 
-    const a = generateContract(s, '1.0.0', now);
-    expect(a).toBeNull();
+    const r = generateContract(s, '1.0.0', now);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.kind).toBe('MISSING_ARTIFACTS');
+    }
   });
 
-  test('returns null when RULES artifacts missing', () => {
+  test('returns MISSING_ARTIFACTS when RULES artifacts missing', () => {
     const now = '2026-01-18T12:00:00.000Z';
     const s = readySession(now);
     s.artifacts.RULES = null as unknown as Record<string, unknown>;
 
-    const a = generateContract(s, '1.0.0', now);
-    expect(a).toBeNull();
+    const r = generateContract(s, '1.0.0', now);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.kind).toBe('MISSING_ARTIFACTS');
+    }
   });
 
   test('canonical_json contains expected fields', () => {
     const now = '2026-01-18T12:00:00.000Z';
     const s = readySession(now);
 
-    const a = generateContract(s, '1.0.0', now);
+    const r = generateContract(s, '1.0.0', now);
 
-    expect(a!.canonical_json).toHaveProperty('meta_contract_id');
-    expect(a!.canonical_json).toHaveProperty('contract_version');
-    expect(a!.canonical_json).toHaveProperty('decision_id');
-    expect(a!.canonical_json).toHaveProperty('framing');
-    expect(a!.canonical_json).toHaveProperty('inputs');
-    expect(a!.canonical_json).toHaveProperty('outputs');
-    expect(a!.canonical_json).toHaveProperty('policies');
-    expect(a!.canonical_json).toHaveProperty('rules');
-    expect(a!.canonical_json).toHaveProperty('generated_at');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.artifact.canonical_json).toHaveProperty('meta_contract_id');
+      expect(r.artifact.canonical_json).toHaveProperty('contract_version');
+      expect(r.artifact.canonical_json).toHaveProperty('decision_id');
+      expect(r.artifact.canonical_json).toHaveProperty('framing');
+      expect(r.artifact.canonical_json).toHaveProperty('inputs');
+      expect(r.artifact.canonical_json).toHaveProperty('outputs');
+      expect(r.artifact.canonical_json).toHaveProperty('policies');
+      expect(r.artifact.canonical_json).toHaveProperty('rules');
+      expect(r.artifact.canonical_json).toHaveProperty('generated_at');
+    }
   });
 });

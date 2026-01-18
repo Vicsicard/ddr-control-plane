@@ -208,12 +208,21 @@ export const FINDINGS = {
       'acceptance_confirmation'
     ),
 
+  contractNotCanonical: (): Finding =>
+    createFinding(
+      FINALIZATION_CODES.INVALID_CONTRACT_NOT_CANONICAL,
+      'BLOCK',
+      INVARIANTS.REPRODUCIBILITY_REQUIRED,
+      'Contract cannot be canonicalized. Check artifact structure.',
+      'FIX_CONTRACT_CANONICALIZATION'
+    ),
+
   contractHashMissing: (): Finding =>
     createFinding(
       FINALIZATION_CODES.VIOLATION_CONTRACT_HASH_MISSING,
       'REJECT',
       INVARIANTS.REPRODUCIBILITY_REQUIRED,
-      'Failed to generate contract artifact.',
+      'Failed to generate contract hash.',
       'FIX_CONTRACT_CANONICALIZATION'
     ),
 

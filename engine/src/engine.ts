@@ -291,10 +291,19 @@ export class MetaDDREngine {
     const framingArtifacts = session.artifacts.FRAMING as FramingArtifacts | null;
     const version =
       requestedVersion || framingArtifacts?.contract_version || '1.0.0';
-    const contractArtifact = generateContract(session, version, now);
+    const result = generateContract(session, version, now);
 
-    if (!contractArtifact) {
-      return this.rejectContractGenerationFailure(session, now);
+    if (!result.ok) {
+      // Map failure modes to frozen FINALIZATION reason codes
+      switch (result.kind) {
+        case 'NOT_CANONICAL':
+          return this.blockContractNotCanonical(session, now);
+        case 'HASH_FAILED':
+          return this.rejectContractHashMissing(session, now);
+        case 'MISSING_ARTIFACTS':
+        default:
+          return this.rejectContractHashMissing(session, now);
+      }
     }
 
     // Mark session as ACCEPTED
@@ -309,7 +318,7 @@ export class MetaDDREngine {
       decision: 'ACCEPTED',
       status: 'ACCEPTED',
       findings: [],
-      contract_artifact: contractArtifact,
+      contract_artifact: result.artifact,
       updated_session: updatedSession,
       server_time: now,
     };
@@ -596,7 +605,29 @@ export class MetaDDREngine {
     };
   }
 
-  private rejectContractGenerationFailure(
+  /**
+   * BLOCK: Contract not canonical (recoverable structural issue)
+   * Uses frozen code: META_FINALIZATION_INVALID_contract_not_canonical
+   */
+  private blockContractNotCanonical(
+    session: IntakeSessionState,
+    now: string
+  ): FinalizeResult {
+    return {
+      decision: 'BLOCK',
+      status: deriveStatus(session),
+      findings: [FINDINGS.contractNotCanonical()],
+      contract_artifact: null,
+      updated_session: session,
+      server_time: now,
+    };
+  }
+
+  /**
+   * REJECT: Contract hash missing (unrecoverable integrity violation)
+   * Uses frozen code: META_FINALIZATION_VIOLATION_contract_hash_missing
+   */
+  private rejectContractHashMissing(
     session: IntakeSessionState,
     now: string
   ): FinalizeResult {

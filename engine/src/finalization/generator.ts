@@ -7,17 +7,35 @@ import { IntakeSessionState } from '../types/session';
 import { ContractArtifact } from '../types/simulation';
 import { canonicalize, computeHash, isCanonicalizable } from './canonicalizer';
 
+// =============================================================================
+// Result Types (Internal - not exposed in public API)
+// =============================================================================
+
+export type GenerateFailureKind = 'MISSING_ARTIFACTS' | 'NOT_CANONICAL' | 'HASH_FAILED';
+
+export type GenerateResult =
+  | { ok: true; artifact: ContractArtifact }
+  | { ok: false; kind: GenerateFailureKind };
+
+// =============================================================================
+// Generator
+// =============================================================================
+
 /**
  * Generate immutable contract artifact from validated session artifacts.
  *
- * Returns null if required artifacts are missing or cannot be canonicalized.
- * The engine will convert null -> FINALIZATION reason code (frozen taxonomy).
+ * Returns a discriminated union for precise failure mode handling:
+ * - MISSING_ARTIFACTS: Required stage artifacts not present
+ * - NOT_CANONICAL: Canonicalization failed (recoverable, BLOCK)
+ * - HASH_FAILED: Hash computation failed (unrecoverable, REJECT)
+ *
+ * The engine maps these to frozen FINALIZATION reason codes.
  */
 export function generateContract(
   session: IntakeSessionState,
   version: string,
   generatedAt: string
-): ContractArtifact | null {
+): GenerateResult {
   const framing = session.artifacts.FRAMING as Record<string, unknown> | null;
   const inputs = session.artifacts.INPUTS as Record<string, unknown> | null;
   const outputs = session.artifacts.OUTPUTS as Record<string, unknown> | null;
@@ -25,7 +43,9 @@ export function generateContract(
   const rules = session.artifacts.RULES as Record<string, unknown> | null;
 
   // Defensive: required artifacts must exist
-  if (!framing || !inputs || !outputs || !policies || !rules) return null;
+  if (!framing || !inputs || !outputs || !policies || !rules) {
+    return { ok: false, kind: 'MISSING_ARTIFACTS' };
+  }
 
   const canonical_json: Record<string, unknown> = {
     meta_contract_id: session.meta_contract_id,
@@ -41,19 +61,36 @@ export function generateContract(
     generated_at: generatedAt,
   };
 
-  if (!isCanonicalizable(canonical_json)) return null;
+  if (!isCanonicalizable(canonical_json)) {
+    return { ok: false, kind: 'NOT_CANONICAL' };
+  }
 
-  const canonicalText = canonicalize(canonical_json);
-  const hash = computeHash(canonicalText);
+  let canonicalText: string;
+  let hash: string;
+
+  try {
+    canonicalText = canonicalize(canonical_json);
+  } catch {
+    return { ok: false, kind: 'NOT_CANONICAL' };
+  }
+
+  try {
+    hash = computeHash(canonicalText);
+  } catch {
+    return { ok: false, kind: 'HASH_FAILED' };
+  }
 
   // For MVP: contract_id = `${decision_id}@${version}`
   const decisionId = String(framing.decision_id ?? 'decision');
   const contractId = `${decisionId}@${version}`;
 
   return {
-    contract_id: contractId,
-    version,
-    hash,
-    canonical_json,
+    ok: true,
+    artifact: {
+      contract_id: contractId,
+      version,
+      hash,
+      canonical_json,
+    },
   };
 }
