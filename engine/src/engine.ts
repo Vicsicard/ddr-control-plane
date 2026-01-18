@@ -291,7 +291,7 @@ export class MetaDDREngine {
     const framingArtifacts = session.artifacts.FRAMING as FramingArtifacts | null;
     const version =
       requestedVersion || framingArtifacts?.contract_version || '1.0.0';
-    const contractArtifact = generateContract(session, version);
+    const contractArtifact = generateContract(session, version, now);
 
     if (!contractArtifact) {
       return this.rejectContractGenerationFailure(session, now);

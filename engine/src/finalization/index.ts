@@ -3,4 +3,6 @@
  */
 
 export { generateContract } from './generator';
-export { canonicalize, computeHash } from './canonicalizer';
+export { canonicalize, computeHash, isCanonicalizable } from './canonicalizer';
+export { toDownloadBytes } from './download';
+export type { DownloadBytes } from './download';

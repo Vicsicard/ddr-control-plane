@@ -1,57 +1,59 @@
 /**
  * Meta DDR Contract Generator
- * Frozen for MVP - v0.1
- * 
- * TODO: Implement in Phase 5
+ * Phase 5: Deterministic contract artifact generation
  */
 
 import { IntakeSessionState } from '../types/session';
 import { ContractArtifact } from '../types/simulation';
-import { FramingArtifacts } from '../types/artifacts';
-import { canonicalize, computeHash } from './canonicalizer';
+import { canonicalize, computeHash, isCanonicalizable } from './canonicalizer';
 
 /**
- * Generate a contract artifact from a validated session.
- * Returns null if generation fails.
- * 
- * Phase 5 will implement:
- * - Canonical JSON assembly from all stage artifacts
- * - Stable serialization
- * - Hash computation
- * - Final invariant sweep
+ * Generate immutable contract artifact from validated session artifacts.
+ *
+ * Returns null if required artifacts are missing or cannot be canonicalized.
+ * The engine will convert null -> FINALIZATION reason code (frozen taxonomy).
  */
 export function generateContract(
   session: IntakeSessionState,
-  version: string
+  version: string,
+  generatedAt: string
 ): ContractArtifact | null {
-  // TODO: Implement in Phase 5
-  // This stub returns a placeholder contract
+  const framing = session.artifacts.FRAMING as Record<string, unknown> | null;
+  const inputs = session.artifacts.INPUTS as Record<string, unknown> | null;
+  const outputs = session.artifacts.OUTPUTS as Record<string, unknown> | null;
+  const policies = session.artifacts.POLICIES as Record<string, unknown> | null;
+  const rules = session.artifacts.RULES as Record<string, unknown> | null;
 
-  const framingArtifacts = session.artifacts.FRAMING as FramingArtifacts | null;
-  if (!framingArtifacts) {
-    return null;
-  }
+  // Defensive: required artifacts must exist
+  if (!framing || !inputs || !outputs || !policies || !rules) return null;
 
-  const contractId = framingArtifacts.decision_id;
-
-  const canonicalJson: Record<string, unknown> = {
-    contract_id: contractId,
-    version,
+  const canonical_json: Record<string, unknown> = {
     meta_contract_id: session.meta_contract_id,
-    framing: session.artifacts.FRAMING,
-    inputs: session.artifacts.INPUTS,
-    outputs: session.artifacts.OUTPUTS,
-    policies: session.artifacts.POLICIES,
-    rules: session.artifacts.RULES,
+    contract_version: version,
+    decision_id: String(framing.decision_id ?? ''),
+
+    framing,
+    inputs,
+    outputs,
+    policies,
+    rules,
+
+    generated_at: generatedAt,
   };
 
-  const canonicalString = canonicalize(canonicalJson);
-  const hash = computeHash(canonicalString);
+  if (!isCanonicalizable(canonical_json)) return null;
+
+  const canonicalText = canonicalize(canonical_json);
+  const hash = computeHash(canonicalText);
+
+  // For MVP: contract_id = `${decision_id}@${version}`
+  const decisionId = String(framing.decision_id ?? 'decision');
+  const contractId = `${decisionId}@${version}`;
 
   return {
     contract_id: contractId,
     version,
     hash,
-    canonical_json: canonicalJson,
+    canonical_json,
   };
 }
