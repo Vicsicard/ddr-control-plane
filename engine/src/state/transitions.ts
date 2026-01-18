@@ -36,3 +36,9 @@ export function getNextStage(currentStage: Stage): Stage | null {
 export function canSubmitToStage(currentStage: Stage, targetStage: Stage): boolean {
   return STAGE_ORDER[targetStage] <= STAGE_ORDER[currentStage];
 }
+
+/**
+ * Alias for canSubmitToStage - patching rule:
+ * evaluateStage() may submit to any stage <= current stage pointer.
+ */
+export const canSubmitToStagePointer = canSubmitToStage;

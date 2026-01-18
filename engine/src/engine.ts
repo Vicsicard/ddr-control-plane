@@ -392,26 +392,37 @@ export class MetaDDREngine {
 
   /**
    * Check all stages are READY for finalization.
-   * Uses frozen reason code - no dynamic code generation.
+   * Uses frozen reason codes only - no dynamic code generation.
+   * 
+   * Per Phase 3 spec:
+   * - FRAMING/INPUTS/OUTPUTS/POLICIES/RULES not READY: META_SIMULATION_INCOMPLETE_stages_not_ready
+   * - SIMULATION_FINALIZATION not READY: META_FINALIZATION_INCOMPLETE_simulation_not_passed
    */
   private checkAllStagesReady(session: IntakeSessionState): Finding[] {
     const findings: Finding[] = [];
-    const allStages: Stage[] = [
+    const priorStages: Stage[] = [
       'FRAMING',
       'INPUTS',
       'OUTPUTS',
       'POLICIES',
       'RULES',
-      'SIMULATION_FINALIZATION',
     ];
 
-    for (const stage of allStages) {
+    // Check prior stages - use META_SIMULATION_INCOMPLETE_stages_not_ready
+    for (const stage of priorStages) {
       if (session.stage_states[stage] !== 'READY') {
-        // Use frozen reason code with field_path and action_target for specificity
-        findings.push(
-          FINDINGS.simulationNotPassed(`stage_states.${stage}`, stage)
-        );
+        findings.push(FINDINGS.stagesNotReady(stage));
       }
+    }
+
+    // Check simulation stage - use META_FINALIZATION_INCOMPLETE_simulation_not_passed
+    if (session.stage_states.SIMULATION_FINALIZATION !== 'READY') {
+      findings.push(
+        FINDINGS.simulationNotPassed(
+          'stage_states.SIMULATION_FINALIZATION',
+          'SIMULATION_FINALIZATION'
+        )
+      );
     }
 
     return findings;
