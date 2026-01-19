@@ -4,7 +4,8 @@ export type Stage =
   | 'OUTPUTS'
   | 'POLICIES'
   | 'RULES'
-  | 'SIMULATION_FINALIZATION';
+  | 'SIMULATION_FINALIZATION'
+  | 'FINALIZATION';
 
 export type StageState = 'LOCKED' | 'EMPTY' | 'DRAFT' | 'INVALID' | 'READY';
 

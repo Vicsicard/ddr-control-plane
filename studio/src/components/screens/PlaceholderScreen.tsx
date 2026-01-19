@@ -13,6 +13,7 @@ const STAGE_DESCRIPTIONS: Record<Stage, string> = {
   POLICIES: 'Define constraints that bound the solution space.',
   RULES: 'Implement deterministic logic within policy bounds.',
   SIMULATION_FINALIZATION: 'Prove correctness and generate artifact.',
+  FINALIZATION: 'Approve and finalize the decision contract.',
 };
 
 export function PlaceholderScreen({ stage, title }: PlaceholderScreenProps) {

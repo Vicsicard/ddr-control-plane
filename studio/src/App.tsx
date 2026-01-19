@@ -1,6 +1,6 @@
 import { useContractStore } from './store/contract-store';
 import { Header, StageNav } from './components/layout';
-import { FramingScreen, InputsScreen, OutputsScreen, PoliciesScreen, RulesScreen, SimulationScreen } from './components/screens';
+import { FramingScreen, InputsScreen, OutputsScreen, PoliciesScreen, RulesScreen, SimulationScreen, FinalizationScreen } from './components/screens';
 
 function App() {
   const { session, goToStage, isStageAccessible } = useContractStore();
@@ -19,6 +19,8 @@ function App() {
         return <RulesScreen />;
       case 'SIMULATION_FINALIZATION':
         return <SimulationScreen />;
+      case 'FINALIZATION':
+        return <FinalizationScreen />;
       default:
         return <FramingScreen />;
     }

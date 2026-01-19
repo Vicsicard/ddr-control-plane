@@ -27,6 +27,7 @@ const STAGE_ORDER: Stage[] = [
   'POLICIES',
   'RULES',
   'SIMULATION_FINALIZATION',
+  'FINALIZATION',
 ];
 
 function createEmptySession(): ContractSession {
@@ -42,6 +43,7 @@ function createEmptySession(): ContractSession {
       POLICIES: 'LOCKED',
       RULES: 'LOCKED',
       SIMULATION_FINALIZATION: 'LOCKED',
+      FINALIZATION: 'LOCKED',
     },
     framing: {
       decision_name: '',
@@ -152,6 +154,7 @@ export const useContractStore = create<ContractStore>((set, get) => ({
     POLICIES: [],
     RULES: [],
     SIMULATION_FINALIZATION: [],
+    FINALIZATION: [],
   },
 
   createNewSession: () => {
