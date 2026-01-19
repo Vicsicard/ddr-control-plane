@@ -130,6 +130,7 @@ interface ContractStore {
   // Finalization actions
   updateFinalization: (data: Partial<FinalizationData>) => void;
   finalizeContract: () => FinalizationResult | null;
+  resetSession: () => void;
   
   // Stage navigation
   validateCurrentStage: () => ValidationError[];
@@ -777,8 +778,11 @@ export const useContractStore = create<ContractStore>((set, get) => ({
         contract_id: contractId,
         version: '1.0.0',
         engine_version: '1.0.0',
+        studio_version: '1.0.0',
+        artifact_schema_version: '1.0.0',
         created_at: session.created_at,
         finalized_at: now,
+        generated_at: now, // Outside canonical hash payload
         stage_readiness: { ...session.stage_states },
         simulation_trace_refs: session.simulation.cases.map((c) => c.case_id),
         reason_code_inventory: Array.from(reasonCodes),
@@ -802,6 +806,10 @@ export const useContractStore = create<ContractStore>((set, get) => ({
     }));
 
     return result;
+  },
+
+  resetSession: () => {
+    set({ session: createEmptySession() });
   },
 
   validateCurrentStage: () => {

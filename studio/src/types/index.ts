@@ -150,8 +150,12 @@ export interface AuditMetadata {
   contract_id: string;
   version: string;
   engine_version: string;
+  studio_version: string;
+  artifact_schema_version: string;
+  // build_commit: string | null; // Future extension: CI/CD injection via VITE_BUILD_COMMIT
   created_at: string;
   finalized_at: string | null;
+  generated_at: string; // Outside canonical hash payload - does not affect integrity
   stage_readiness: Record<Stage, StageState>;
   simulation_trace_refs: string[];
   reason_code_inventory: string[];
