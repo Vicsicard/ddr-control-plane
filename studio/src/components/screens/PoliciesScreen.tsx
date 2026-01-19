@@ -20,8 +20,12 @@ const CONDITION_OPERATOR_OPTIONS = [
   { value: 'IS_ABSENT', label: 'IS_ABSENT' },
   { value: 'EQUALS', label: 'EQUALS' },
   { value: 'NOT_EQUALS', label: 'NOT_EQUALS' },
-  { value: 'GREATER_THAN', label: 'GREATER_THAN' },
-  { value: 'LESS_THAN', label: 'LESS_THAN' },
+  { value: 'GREATER_THAN', label: 'GREATER_THAN (>)' },
+  { value: 'GREATER_THAN_OR_EQUAL', label: 'GREATER_THAN_OR_EQUAL (>=)' },
+  { value: 'LESS_THAN', label: 'LESS_THAN (<)' },
+  { value: 'LESS_THAN_OR_EQUAL', label: 'LESS_THAN_OR_EQUAL (<=)' },
+  { value: 'IN', label: 'IN (value in list)' },
+  { value: 'NOT_IN', label: 'NOT_IN (value not in list)' },
 ];
 
 export function PoliciesScreen() {

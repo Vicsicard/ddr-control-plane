@@ -635,7 +635,12 @@ export const useContractStore = create<ContractStore>((set, get) => ({
         if (rule.condition) {
           const inputRef = rule.condition.left_operand.replace('input.', '');
           const inputValue = inputMap[inputRef];
-          const compareValue = rule.condition.right_operand;
+          // If right_operand references an input, look it up; otherwise use literal value
+          let compareValue = rule.condition.right_operand || '';
+          if (compareValue.startsWith('input.')) {
+            const compareRef = compareValue.replace('input.', '');
+            compareValue = inputMap[compareRef] || compareValue;
+          }
           let matches = false;
 
           switch (rule.condition.operator) {
