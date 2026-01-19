@@ -18,7 +18,13 @@ import type {
   ValidationError,
   FinalizationResult,
 } from '../types';
-import { validateFraming, validateInputs, validateOutputs, validatePolicies, validateRules, validateSimulation } from '../validators';
+// All validators removed - Engine is the sole authority
+// import { ... } from '../validators'; // DELETED - no fallback validators
+import { 
+  validateStageViaEngine, 
+  finalizeViaEngine,
+  isEngineAvailable,
+} from '../engine-adapter';
 
 const STAGE_ORDER: Stage[] = [
   'FRAMING',
@@ -131,11 +137,11 @@ interface ContractStore {
   
   // Finalization actions
   updateFinalization: (data: Partial<FinalizationData>) => void;
-  finalizeContract: () => FinalizationResult | null;
+  finalizeContract: () => Promise<FinalizationResult | null>;
   resetSession: () => void;
   
   // Stage navigation
-  validateCurrentStage: () => ValidationError[];
+  validateCurrentStage: () => Promise<ValidationError[]>;
   canProceedToNextStage: () => boolean;
   proceedToNextStage: () => void;
   goToStage: (stage: Stage) => void;
@@ -143,6 +149,69 @@ interface ContractStore {
   // Helpers
   getStageIndex: (stage: Stage) => number;
   isStageAccessible: (stage: Stage) => boolean;
+}
+
+/**
+ * Fallback validation using local Studio validators.
+ * Used when engine server is unreachable.
+ * 
+ * NOTE: FRAMING has NO fallback. Engine is mandatory for Framing.
+ * This is a governance decision: the authority declaration must come from the engine.
+ */
+function validateCurrentStageFallback(session: ContractSession): ValidationError[] {
+  switch (session.current_stage) {
+    case 'FRAMING':
+      // NO FALLBACK FOR FRAMING - Engine is mandatory
+      // Return a blocking error indicating engine is required
+      return [{
+        code: 'ENGINE_REQUIRED',
+        field_path: null,
+        message: 'DCG Engine is required for Framing validation. Engine server is unavailable.',
+        severity: 'BLOCK',
+      }];
+    case 'INPUTS':
+      // NO FALLBACK FOR INPUTS - Engine is mandatory
+      return [{
+        code: 'ENGINE_REQUIRED',
+        field_path: null,
+        message: 'DCG Engine is required for Inputs validation. Engine server is unavailable.',
+        severity: 'BLOCK',
+      }];
+    case 'OUTPUTS':
+      // NO FALLBACK FOR OUTPUTS - Engine is mandatory
+      return [{
+        code: 'ENGINE_REQUIRED',
+        field_path: null,
+        message: 'DCG Engine is required for Outputs validation. Engine server is unavailable.',
+        severity: 'BLOCK',
+      }];
+    case 'POLICIES':
+      // NO FALLBACK FOR POLICIES - Engine is mandatory
+      return [{
+        code: 'ENGINE_REQUIRED',
+        field_path: null,
+        message: 'DCG Engine is required for Policies validation. Engine server is unavailable.',
+        severity: 'BLOCK',
+      }];
+    case 'RULES':
+      // NO FALLBACK FOR RULES - Engine is mandatory
+      return [{
+        code: 'ENGINE_REQUIRED',
+        field_path: null,
+        message: 'DCG Engine is required for Rules validation. Engine server is unavailable.',
+        severity: 'BLOCK',
+      }];
+    case 'SIMULATION_FINALIZATION':
+      // NO FALLBACK FOR SIMULATION - Engine is mandatory
+      return [{
+        code: 'ENGINE_REQUIRED',
+        field_path: null,
+        message: 'DCG Engine is required for Simulation validation. Engine server is unavailable.',
+        severity: 'BLOCK',
+      }];
+    default:
+      return [];
+  }
 }
 
 export const useContractStore = create<ContractStore>((set, get) => ({
@@ -732,7 +801,7 @@ export const useContractStore = create<ContractStore>((set, get) => ({
     }));
   },
 
-  finalizeContract: () => {
+  finalizeContract: async () => {
     const { session } = get();
     
     if (!session.finalization.approval_confirmed) {
@@ -743,6 +812,79 @@ export const useContractStore = create<ContractStore>((set, get) => ({
       return null;
     }
 
+    // Use engine server for finalization (engine computes hash, Studio only renders)
+    if (isEngineAvailable()) {
+      try {
+        console.log('[CONTRACT-STORE] Calling engine for finalization...');
+        const engineResult = await finalizeViaEngine(session, '1.0.0');
+        
+        if (!engineResult.success || !engineResult.contract) {
+          console.error('[CONTRACT-STORE] Engine finalization failed:', engineResult);
+          return null;
+        }
+
+        const now = engineResult.timestamp;
+        const reasonCodes = new Set<string>();
+        session.policies.policies.forEach((p) => {
+          if (p.reason_code) reasonCodes.add(p.reason_code);
+        });
+        session.rules.rules.forEach((r) => {
+          if (r.reason_code) reasonCodes.add(r.reason_code);
+        });
+
+        const result: FinalizationResult = {
+          decision: 'ACCEPTED',
+          contract_id: engineResult.contract.contract_id,
+          hash: engineResult.contract.hash,
+          hash_algorithm: 'SHA-256',
+          canonical_byte_length: engineResult.canonical_json?.length ?? 0,
+          hash_timestamp: now,
+          exports: {
+            canonical_json: true,
+            pdf: true,
+            markdown: true,
+          },
+          audit_metadata: {
+            contract_id: engineResult.contract.contract_id,
+            version: engineResult.contract.version,
+            engine_version: '1.0.0',
+            studio_version: '1.0.0',
+            artifact_schema_version: '1.0.0',
+            created_at: session.created_at,
+            finalized_at: now,
+            generated_at: now,
+            stage_readiness: { ...session.stage_states },
+            simulation_trace_refs: session.simulation.cases.map((c) => c.case_id),
+            reason_code_inventory: Array.from(reasonCodes),
+            author_identity: null,
+          },
+        };
+
+        set((state) => ({
+          session: {
+            ...state.session,
+            finalization: {
+              ...state.session.finalization,
+              is_finalized: true,
+              result,
+            },
+            stage_states: {
+              ...state.session.stage_states,
+              SIMULATION_FINALIZATION: 'READY' as StageState,
+            },
+          },
+        }));
+
+        console.log('[CONTRACT-STORE] Finalization complete. Hash from engine:', engineResult.contract.hash);
+        return result;
+      } catch (err) {
+        console.error('[CONTRACT-STORE] Engine finalization error, falling back to local:', err);
+        // Fall through to local finalization
+      }
+    }
+
+    // Fallback: local finalization (only if engine unavailable)
+    console.warn('[CONTRACT-STORE] Using local finalization (engine unavailable)');
     const canonicalContract = {
       framing: session.framing,
       inputs: session.inputs,
@@ -790,7 +932,7 @@ export const useContractStore = create<ContractStore>((set, get) => ({
         artifact_schema_version: '1.0.0',
         created_at: session.created_at,
         finalized_at: now,
-        generated_at: now, // Outside canonical hash payload
+        generated_at: now,
         stage_readiness: { ...session.stage_states },
         simulation_trace_refs: session.simulation.cases.map((c) => c.case_id),
         reason_code_inventory: Array.from(reasonCodes),
@@ -820,36 +962,28 @@ export const useContractStore = create<ContractStore>((set, get) => ({
     set({ session: createEmptySession() });
   },
 
-  validateCurrentStage: () => {
+  validateCurrentStage: async () => {
     const { session } = get();
     let errors: ValidationError[] = [];
+    let newState: StageState;
 
-    switch (session.current_stage) {
-      case 'FRAMING':
-        errors = validateFraming(session.framing, session);
-        break;
-      case 'INPUTS':
-        errors = validateInputs(session.inputs, session);
-        break;
-      case 'OUTPUTS':
-        errors = validateOutputs(session.outputs, session);
-        break;
-      case 'POLICIES':
-        errors = validatePolicies(session.policies, session);
-        break;
-      case 'RULES':
-        errors = validateRules(session.rules, session);
-        break;
-      case 'SIMULATION_FINALIZATION':
-        errors = validateSimulation(session.simulation, session);
-        break;
-      default:
-        errors = [];
+    // Use engine validation via HTTP API (engine server is the authority)
+    if (isEngineAvailable()) {
+      try {
+        const engineResult = await validateStageViaEngine(session, session.current_stage);
+        errors = engineResult.errors;
+        newState = engineResult.stageState === 'READY' ? 'READY' : 'INVALID';
+      } catch (err) {
+        console.error('[CONTRACT-STORE] Engine validation failed, using fallback:', err);
+        // Fallback to local validators if engine is unreachable
+        errors = validateCurrentStageFallback(session);
+        newState = errors.some((e) => e.severity === 'BLOCK') ? 'INVALID' : 'READY';
+      }
+    } else {
+      // Fallback to Studio validators if engine not available
+      errors = validateCurrentStageFallback(session);
+      newState = errors.some((e) => e.severity === 'BLOCK') ? 'INVALID' : 'READY';
     }
-
-    const newState: StageState = errors.some((e) => e.severity === 'BLOCK')
-      ? 'INVALID'
-      : 'READY';
 
     set((state) => ({
       validationErrors: {

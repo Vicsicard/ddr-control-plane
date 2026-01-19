@@ -53,12 +53,12 @@ export function PoliciesScreen() {
   const hasRefusalOutput = outputs.outputs.some((o) => o.category === 'REFUSAL');
   const hasEscalationDefined = framing.escalation_requirement !== 'NONE';
 
-  const handleValidate = () => {
-    validateCurrentStage();
+  const handleValidate = async () => {
+    await validateCurrentStage();
   };
 
-  const handleProceed = () => {
-    const validationErrors = validateCurrentStage();
+  const handleProceed = async () => {
+    const validationErrors = await validateCurrentStage();
     if (validationErrors.length === 0) {
       proceedToNextStage();
     }

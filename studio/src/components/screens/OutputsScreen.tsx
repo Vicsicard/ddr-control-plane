@@ -38,12 +38,12 @@ export function OutputsScreen() {
 
   const refusalLocked = hasInputRefusalBehavior;
 
-  const handleValidate = () => {
-    validateCurrentStage();
+  const handleValidate = async () => {
+    await validateCurrentStage();
   };
 
-  const handleProceed = () => {
-    const validationErrors = validateCurrentStage();
+  const handleProceed = async () => {
+    const validationErrors = await validateCurrentStage();
     if (validationErrors.length === 0) {
       proceedToNextStage();
     }

@@ -47,12 +47,12 @@ export function RulesScreen() {
     outputs.outputs.filter((o) => o.requires_reason_code).map((o) => o.code)
   );
 
-  const handleValidate = () => {
-    validateCurrentStage();
+  const handleValidate = async () => {
+    await validateCurrentStage();
   };
 
-  const handleProceed = () => {
-    const validationErrors = validateCurrentStage();
+  const handleProceed = async () => {
+    const validationErrors = await validateCurrentStage();
     if (validationErrors.length === 0) {
       proceedToNextStage();
     }

@@ -35,12 +35,12 @@ export function InputsScreen() {
   const { inputs } = session;
   const errors = validationErrors.INPUTS;
 
-  const handleValidate = () => {
-    validateCurrentStage();
+  const handleValidate = async () => {
+    await validateCurrentStage();
   };
 
-  const handleProceed = () => {
-    const validationErrors = validateCurrentStage();
+  const handleProceed = async () => {
+    const validationErrors = await validateCurrentStage();
     if (validationErrors.length === 0) {
       proceedToNextStage();
     }

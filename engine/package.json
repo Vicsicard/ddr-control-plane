@@ -2,6 +2,7 @@
   "name": "@ddr/meta-engine",
   "version": "0.1.0",
   "description": "Meta DDR Engine - Headless decision validation engine for DDR Control Plane",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
