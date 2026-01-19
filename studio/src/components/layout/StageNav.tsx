@@ -15,6 +15,7 @@ const STAGES: { id: Stage; label: string; number: number }[] = [
   { id: 'POLICIES', label: 'Policies', number: 4 },
   { id: 'RULES', label: 'Rules', number: 5 },
   { id: 'SIMULATION_FINALIZATION', label: 'Simulation & Proof', number: 6 },
+  { id: 'FINALIZATION', label: 'Finalization', number: 7 },
 ];
 
 function getStateIcon(state: StageState, isCurrent: boolean) {
