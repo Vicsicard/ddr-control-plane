@@ -1,0 +1,9 @@
+{
+  "buildCommand": "cd studio && npm install && npm run build",
+  "outputDirectory": "studio/dist",
+  "framework": "vite",
+  "installCommand": "echo 'Install handled in buildCommand'",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/" }
+  ]
+}
